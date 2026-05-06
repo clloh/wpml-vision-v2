@@ -1,0 +1,62 @@
+/* WPML AI Translation + Vision v2 — injected into WPML pages */
+
+/* ── Inline translate buttons ── */
+.wpml-ai-btn {
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 8px;
+  transition: background-color .2s, opacity .2s;
+}
+
+.wpml-ai-translate-btn,
+.wpml-ai-all-btn {
+  background: #27ad95;
+}
+.wpml-ai-translate-btn:hover,
+.wpml-ai-all-btn:hover { background: #229982; }
+
+.wpml-ai-stop-btn { background: #dc3545; }
+.wpml-ai-stop-btn:hover { background: #c82333; }
+
+.wpml-ai-btn:disabled {
+  background: #6c757d !important;
+  cursor: not-allowed;
+  opacity: .7;
+}
+
+/* Working state: spinning icon */
+.wpml-ai-btn.working { position: relative; padding-left: 30px; }
+.wpml-ai-btn.working::before {
+  content: '';
+  position: absolute;
+  left: 10px; top: 50%;
+  margin-top: -6px;
+  width: 12px; height: 12px;
+  border: 2px solid rgba(255,255,255,.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: wpml-spin .7s linear infinite;
+}
+@keyframes wpml-spin { to { transform: rotate(360deg); } }
+
+/* ── Nav flex fix ── */
+.otgs-editor-container .nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ── Row fill highlights ── */
+tr[style*="rgba(34,197,94"] { transition: background .4s ease; }
+tr[style*="rgba(251,191,36"] { transition: background .4s ease; }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .wpml-ai-btn { padding: 6px 10px; font-size: 12px; }
+}

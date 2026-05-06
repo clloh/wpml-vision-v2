@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "WPML AI Translation + Vision",
+  "version": "2.0.0",
+  "description": "AI translation for WPML: auto-translate fields OR upload a Drupal screenshot to map translations visually.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://*.ate.wpml.org/*",
+    "*://*.wpml.org/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*.ate.wpml.org/dashboard*", "*://*.wpml.org/*dashboard*"],
+      "js": ["content.js"],
+      "css": ["style.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WPML AI Translation + Vision</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 480px;
+      max-height: 680px;
+      overflow-y: auto;
+      background: #0e1016;
+      color: #dde1ec;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    /* ── Header ── */
+    .header {
+      padding: 14px 18px 12px;
+      border-bottom: 1px solid #1f2235;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg, #27ad95, #1a7a6a);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; flex-shrink: 0;
+    }
+    .header-title { font-size: 14px; font-weight: 600; color: #eef0f8; }
+    .header-sub   { font-size: 11px; color: #5c6480; }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #1f2235;
+      background: #13161f;
+    }
+    .tab {
+      flex: 1; padding: 9px 6px;
+      text-align: center; font-size: 12px; font-weight: 500;
+      color: #5c6480; cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color .2s, border-color .2s;
+      user-select: none;
+    }
+    .tab.active { color: #27ad95; border-bottom-color: #27ad95; }
+    .tab:hover:not(.active) { color: #9da5c0; }
+
+    /* ── Panels ── */
+    .panel { display: none; padding: 16px 18px; }
+    .panel.active { display: block; }
+
+    /* ── Mode A: Auto-translate ── */
+    .mode-label {
+      font-size: 11px; font-weight: 600; letter-spacing: .06em;
+      text-transform: uppercase; color: #5c6480;
+      margin-bottom: 10px;
+    }
+    .info-box {
+      background: #13161f; border: 1px solid #1f2235;
+      border-radius: 8px; padding: 12px 14px;
+      font-size: 12px; color: #7a839e; line-height: 1.6;
+    }
+    .info-box strong { color: #dde1ec; }
+    .info-box .step {
+      display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px;
+    }
+    .info-box .step:last-child { margin-bottom: 0; }
+    .step-num {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #1f2235; color: #27ad95;
+      font-size: 10px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .badge-green {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: rgba(39,173,149,.12); border: 1px solid rgba(39,173,149,.25);
+      color: #27ad95; border-radius: 4px;
+      padding: 2px 7px; font-size: 11px; font-weight: 600;
+    }
+
+    /* ── Mode B: Vision ── */
+    .upload-zone {
+      border: 2px dashed #1f2235; border-radius: 10px;
+      padding: 24px 16px; text-align: center;
+      cursor: pointer; background: #13161f;
+      transition: border-color .2s, background .2s;
+      position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: #27ad95;
+      background: rgba(39,173,149,.04);
+    }
+    .upload-zone input[type="file"] { display: none; }
+    .upload-icon { font-size: 26px; margin-bottom: 8px; }
+    .upload-zone h3 { font-size: 13px; font-weight: 600; color: #dde1ec; margin-bottom: 4px; }
+    .upload-zone p  { font-size: 11px; color: #5c6480; }
+
+    .preview-wrap {
+      margin-top: 12px; border-radius: 8px; overflow: hidden;
+      border: 1px solid #1f2235; position: relative;
+    }
+    .preview-wrap img { width: 100%; display: block; max-height: 150px; object-fit: cover; object-position: top; }
+    .preview-remove {
+      position: absolute; top: 6px; right: 6px;
+      background: rgba(0,0,0,.6); border: none; border-radius: 50%;
+      width: 22px; height: 22px; color: white; cursor: pointer;
+      font-size: 12px; display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── Page info strip ── */
+    .page-strip {
+      margin-top: 10px; background: #13161f;
+      border: 1px solid #1f2235; border-radius: 8px;
+      padding: 9px 12px; display: none;
+    }
+    .page-strip.show { display: flex; align-items: center; gap: 12px; }
+    .strip-item { font-size: 11px; }
+    .strip-item .label { color: #5c6480; }
+    .strip-item .value { color: #dde1ec; font-weight: 500; margin-left: 4px; }
+    .pill {
+      display: inline-block; padding: 1px 8px; border-radius: 20px;
+      font-size: 10px; font-weight: 600; letter-spacing: .04em;
+    }
+    .pill-teal   { background: rgba(39,173,149,.15); color: #27ad95; }
+    .pill-amber  { background: rgba(251,191,36,.12);  color: #fbbf24; }
+    .pill-purple { background: rgba(139,92,246,.14);  color: #a78bfa; }
+
+    /* ── Options row ── */
+    .opt-row {
+      display: flex; align-items: center; gap: 8px;
+      margin: 10px 0; font-size: 12px; color: #9da5c0;
+    }
+    .toggle { position: relative; width: 30px; height: 16px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute; inset: 0; background: #1f2235;
+      border: 1px solid #2c3050; border-radius: 8px; cursor: pointer; transition: .2s;
+    }
+    .toggle-thumb {
+      position: absolute; width: 10px; height: 10px;
+      top: 2px; left: 2px; background: #5c6480;
+      border-radius: 50%; transition: .2s; pointer-events: none;
+    }
+    .toggle input:checked ~ .toggle-track { background: #27ad95; border-color: #27ad95; }
+    .toggle input:checked ~ .toggle-thumb { transform: translateX(14px); background: #fff; }
+
+    /* ── Preview table ── */
+    .preview-table-wrap {
+      margin-top: 12px; border: 1px solid #1f2235; border-radius: 8px;
+      max-height: 200px; overflow-y: auto;
+    }
+    .preview-table-wrap::-webkit-scrollbar { width: 4px; }
+    .preview-table-wrap::-webkit-scrollbar-track { background: transparent; }
+    .preview-table-wrap::-webkit-scrollbar-thumb { background: #1f2235; border-radius: 4px; }
+    .prow {
+      display: grid; grid-template-columns: 1fr 1fr;
+      padding: 7px 10px; border-bottom: 1px solid #1f2235;
+      font-size: 11px; gap: 8px;
+    }
+    .prow:last-child { border-bottom: none; }
+    .prow .src  { color: #5c6480; }
+    .prow .trn  { color: #27ad95; font-weight: 500; }
+    .prow .trn.null { color: #fbbf24; font-style: italic; }
+    .prow .trn.code { color: #5c6480; font-family: monospace; }
+
+    .stats-row {
+      display: flex; gap: 8px; margin: 10px 0;
+    }
+    .stat {
+      flex: 1; background: #13161f; border: 1px solid #1f2235;
+      border-radius: 8px; padding: 8px; text-align: center;
+    }
+    .stat .n { font-size: 20px; font-weight: 700; }
+    .stat .l { font-size: 10px; color: #5c6480; text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+    .stat.green .n { color: #27ad95; }
+    .stat.amber .n { color: #fbbf24; }
+    .stat.blue  .n { color: #60a5fa; }
+    .preview-label { font-size: 10px; color: #5c6480; text-transform: uppercase; letter-spacing: .06em; margin: 10px 0 4px; }
+
+    /* ── Buttons ── */
+    .btn {
+      width: 100%; padding: 9px 14px; border-radius: 8px;
+      border: none; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all .2s; margin-top: 10px;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn-primary  { background: #27ad95; color: #fff; }
+    .btn-primary:hover { background: #229982; }
+    .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-apply    { background: #1a6b5a; color: #27ad95; border: 1px solid rgba(39,173,149,.35); }
+    .btn-apply:hover { background: #1f7f6b; }
+    .btn-ghost    { background: #13161f; color: #9da5c0; border: 1px solid #1f2235; }
+    .btn-ghost:hover { background: #1a1d2a; }
+
+    /* ── Status bar ── */
+    .status {
+      margin-top: 10px; padding: 8px 12px;
+      border-radius: 8px; font-size: 12px; display: none;
+    }
+    .status.show { display: block; }
+    .status.loading { background: rgba(96,165,250,.08); border: 1px solid rgba(96,165,250,.25); color: #60a5fa; }
+    .status.success { background: rgba(39,173,149,.08); border: 1px solid rgba(39,173,149,.25); color: #27ad95; }
+    .status.error   { background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.25); color: #f87171; }
+    .spinner {
+      display: inline-block; width: 11px; height: 11px;
+      border: 2px solid transparent; border-top-color: currentColor;
+      border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Settings ── */
+    .section-title {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .06em; color: #5c6480; margin-bottom: 10px;
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-label { display: block; font-size: 11px; font-weight: 600; color: #5c6480; margin-bottom: 5px; }
+    .form-control {
+      width: 100%; padding: 8px 10px; background: #13161f;
+      border: 1px solid #1f2235; border-radius: 7px;
+      color: #dde1ec; font-size: 12px; outline: none; transition: border-color .2s;
+      font-family: inherit;
+    }
+    .form-control:focus { border-color: #27ad95; }
+    select.form-control option { background: #13161f; }
+    textarea.form-control { resize: vertical; min-height: 90px; line-height: 1.4; font-family: monospace; font-size: 11px; }
+    .help { font-size: 11px; color: #5c6480; margin-top: 4px; }
+    .api-status {
+      display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 600;
+    }
+    .api-status.saved   { color: #27ad95; }
+    .api-status.unsaved { color: #f87171; }
+    #model-info { font-size: 11px; color: #5c6480; margin-top: 5px; }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px; background: #1f2235; margin: 14px 0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">🌐</div>
+  <div>
+    <div class="header-title">WPML AI Translation + Vision</div>
+    <div class="header-sub">Auto-translate fields · or fill from a screenshot</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="auto">Auto Translate</div>
+  <div class="tab" data-tab="vision">Vision Fill</div>
+  <div class="tab" data-tab="settings">Settings</div>
+</div>
+
+<!-- ══ MODE A: AUTO-TRANSLATE ════════════════════════════════════════════════ -->
+<div class="panel active" id="tab-auto">
+  <div class="mode-label">How to use</div>
+  <div class="info-box">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div>Open a WPML translation page on <strong>ate.wpml.org</strong></div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div>Click a field to make it active in the TinyMCE editor</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div>
+        Use the buttons injected into the editor toolbar:<br>
+        <span class="badge-green">AI Translate</span> — current field only &nbsp;
+        <span class="badge-green">AI Translate All</span> — auto-advances through all fields
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div>Fields are saved automatically. Use <strong>Stop</strong> to abort at any time.</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="mode-label">Requires</div>
+  <div class="info-box">
+    OpenRouter API key + model configured in <strong>Settings</strong>.<br>
+    All translation quality settings (system prompt) are also controlled in Settings.
+  </div>
+</div>
+
+<!-- ══ MODE B: VISION FILL ═══════════════════════════════════════════════════ -->
+<div class="panel" id="tab-vision">
+
+  <!-- Upload zone -->
+  <div class="upload-zone" id="uploadZone">
+    <input type="file" id="fileInput" accept="image/*">
+    <div class="upload-icon">📸</div>
+    <h3>Drop a screenshot here</h3>
+    <p>Screenshot of the translated Drupal page (any language)</p>
+  </div>
+
+  <div class="preview-wrap" id="previewWrap" style="display:none">
+    <img id="previewImg" src="" alt="Screenshot preview">
+    <button class="preview-remove" id="removeImg" title="Remove">✕</button>
+  </div>
+
+  <!-- Page info strip -->
+  <div class="page-strip" id="pageStrip">
+    <div class="strip-item">
+      <span class="label">Language:</span>
+      <span class="value" id="stripLang">—</span>
+    </div>
+    <div class="strip-item">
+      <span class="label">Fields:</span>
+      <span class="value" id="stripFields">—</span>
+    </div>
+    <div class="strip-item">
+      <span class="label">Provider:</span>
+      <span class="value" id="stripProvider">—</span>
+    </div>
+  </div>
+
+  <!-- Options -->
+  <div class="opt-row">
+    <label class="toggle">
+      <input type="checkbox" id="onlyEmpty" checked>
+      <div class="toggle-track"></div>
+      <div class="toggle-thumb"></div>
+    </label>
+    <span>Only fill empty fields</span>
+  </div>
+
+  <!-- Analyse button -->
+  <button class="btn btn-primary" id="analyzeBtn" disabled>🔍 Analyse Screenshot</button>
+  <div class="status" id="visionStatus"></div>
+
+  <!-- Preview results (hidden until analysis) -->
+  <div id="previewResults" style="display:none">
+    <div class="stats-row">
+      <div class="stat green"><div class="n" id="statMatched">0</div><div class="l">Matched</div></div>
+      <div class="stat amber"><div class="n" id="statMissed">0</div><div class="l">Not found</div></div>
+      <div class="stat blue"><div class="n" id="statTotal">0</div><div class="l">Total</div></div>
+    </div>
+    <button class="btn btn-apply" id="applyBtn">✅ Apply Translations to Page</button>
+    <button class="btn btn-ghost" id="reanalyzeBtn" style="margin-top:6px">🔄 Re-analyse</button>
+    <div class="preview-label">Preview (scroll to review)</div>
+    <div class="preview-table-wrap" id="previewTable"></div>
+  </div>
+
+</div>
+
+<!-- ══ SETTINGS ═══════════════════════════════════════════════════════════════ -->
+<div class="panel" id="tab-settings">
+
+  <!-- ── OpenRouter (Mode A + fallback for vision) ── -->
+  <div class="section-title">OpenRouter — Auto Translate <span style="color:#27ad95">(Mode A)</span></div>
+
+  <div class="form-group">
+    <label class="form-label">
+      API Key
+      <span class="api-status" id="orKeyStatus"></span>
+    </label>
+    <input type="password" class="form-control" id="orKey" placeholder="sk-or-v1-...">
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">Model</label>
+    <input list="model-list" class="form-control" id="modelSelect" placeholder="Type to search (e.g. openai/gpt-4o-mini)..." disabled>
+    <datalist id="model-list"><option value="Loading..."></option></datalist>
+    <div id="model-info"></div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">System Prompt</label>
+    <textarea class="form-control" id="systemPrompt" rows="4"></textarea>
+    <div class="help">Controls how the AI translates each field in auto-translate mode.</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ── Vision provider (Mode B) ── -->
+  <div class="section-title">Vision AI — Screenshot Fill <span style="color:#a78bfa">(Mode B)</span></div>
+
+  <div class="form-group">
+    <label class="form-label">Provider</label>
+    <select class="form-control" id="visionProvider">
+      <option value="openrouter">OpenRouter (reuse key above)</option>
+      <option value="openai">OpenAI</option>
+      <option value="anthropic">Anthropic (Claude)</option>
+    </select>
+  </div>
+
+  <div class="form-group" id="visionKeyGroup" style="display:none">
+    <label class="form-label">Vision API Key <span class="help" style="display:inline">(if different from OpenRouter)</span></label>
+    <input type="password" class="form-control" id="visionKey" placeholder="sk-...">
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">Vision Model</label>
+    <select class="form-control" id="visionModel">
+      <optgroup label="✅ Free on OpenRouter">
+        <option value="google/gemini-2.5-flash">gemini-2.5-flash ⭐ recommended</option>
+        <option value="google/gemini-2.5-flash-lite">gemini-2.5-flash-lite (faster)</option>
+        <option value="google/gemini-2.0-flash-001">gemini-2.0-flash</option>
+      </optgroup>
+      <optgroup label="💳 Paid — OpenRouter">
+        <option value="openai/gpt-4o">openai/gpt-4o</option>
+        <option value="openai/gpt-4o-mini">openai/gpt-4o-mini</option>
+        <option value="anthropic/claude-opus-4-5">claude-opus-4-5</option>
+      </optgroup>
+      <optgroup label="🔑 Direct API key required">
+        <option value="gpt-4o" data-provider="openai">gpt-4o (OpenAI direct)</option>
+        <option value="claude-opus-4-5-20251101" data-provider="anthropic">claude-opus-4-5 (Anthropic direct)</option>
+      </optgroup>
+    </select>
+    <div class="help">Use a vision-capable model. <strong style="color:#27ad95">Gemini 2.5 Flash is free</strong> and works great for translation mapping.</div>
+  </div>
+
+  <button class="btn btn-primary" id="saveBtn" style="margin-top:4px">💾 Save All Settings</button>
+  <div class="status" id="settingsStatus"></div>
+
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

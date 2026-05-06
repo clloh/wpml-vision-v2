@@ -36,12 +36,13 @@ This extension solves that by:
 - Sends segments + screenshot to a vision-capable AI model in a single API call
 - Semantically maps translated text from the screenshot to the correct WPML field — regardless of page layout or DOM structure
 - Preview table shows matched vs unmatched fields before anything is written
-- Applies translations field by field: opens each empty segment, writes the translation, saves, and advances
-- Rows highlight green (filled) or amber (not found) as they are processed
+- Shows a loading state while translations are being applied; reports filled / skipped / unmatched when done
 - "Only fill empty fields" toggle — safely skips segments that already have translations
-- Supports OpenRouter (free and paid models), OpenAI direct, and Anthropic direct
+- Supports **OpenRouter**, **OpenAI**, **Anthropic**, and **Azure OpenAI**
 
 ### General
+- Opens as a **persistent floating window** — does not close when you click outside; stays open while you work in the WPML editor. Close it with the **✕** button in the header
+- Re-clicking the extension icon focuses the existing window instead of opening a duplicate
 - Works on `e.ate.wpml.org` (WPML Advanced Translation Editor)
 - Correctly handles the React/div-based ATE layout (not table-based)
 - Reads both plain-text segments and TinyMCE rich-text iframe segments
@@ -55,8 +56,11 @@ This extension solves that by:
 
 - Google Chrome (or any Chromium-based browser supporting Manifest V3)
 - A WPML account with access to the Advanced Translation Editor (`e.ate.wpml.org`)
-- An [OpenRouter](https://openrouter.ai) API key (free tier available) — required for both modes
-- Optionally: an [OpenAI](https://platform.openai.com) or [Anthropic](https://console.anthropic.com) API key if using those providers directly for vision
+- At least one of the following:
+  - An [OpenRouter](https://openrouter.ai) API key — required for Mode A; also usable for Mode B
+  - An [OpenAI](https://platform.openai.com) API key (Vision Fill only)
+  - An [Anthropic](https://console.anthropic.com) API key (Vision Fill only)
+  - An Azure OpenAI deployment with a vision-capable model (Vision Fill only)
 
 ---
 
@@ -84,16 +88,37 @@ Click the extension icon → go to the **Settings** tab.
 | Field | Description |
 |---|---|
 | API Key | Your OpenRouter key — starts with `sk-or-v1-`. Get one at [openrouter.ai/keys](https://openrouter.ai/keys) |
-| Model | Auto-loaded from OpenRouter's live model list. Type to search. Used for Mode A (auto-translate) |
+| Model | Auto-loaded from OpenRouter's live model list. Type to search. Used for Mode A (auto-translate) only |
 | System Prompt | Controls translation rules for Mode A. Edit to match your brand voice or add protected terms |
 
 ### Vision AI (Mode B only)
 
+Select your preferred provider. Each provider requires its own credentials.
+
+#### OpenRouter
+Reuses the API key from the Mode A section. No additional key needed.
+
+#### OpenAI
 | Field | Description |
 |---|---|
-| Provider | **OpenRouter** (reuse the key above), **OpenAI**, or **Anthropic** |
-| Vision API Key | Only required if using OpenAI or Anthropic directly — leave blank for OpenRouter |
-| Vision Model | Must be a vision-capable model. See recommended models below |
+| Vision API Key | Your OpenAI key — starts with `sk-` |
+| Vision Model | Select from the dropdown, e.g. `gpt-4o` |
+
+#### Anthropic
+| Field | Description |
+|---|---|
+| Vision API Key | Your Anthropic key |
+| Vision Model | Select from the dropdown, e.g. `claude-opus-4-5` |
+
+#### Azure OpenAI
+| Field | Description |
+|---|---|
+| Azure API Key | API key from Azure portal → your resource → **Keys and Endpoint** |
+| Endpoint | The resource endpoint, e.g. `https://your-resource.openai.azure.com/` |
+| Deployment Name | The name of your GPT-4o (or other vision) deployment |
+| API Version | Azure API version, e.g. `2024-12-01-preview` |
+
+> The Vision Model dropdown is hidden when Azure is selected — the model is determined by your deployment, not a separate selector.
 
 ### Recommended Vision Models
 
@@ -101,10 +126,11 @@ Click the extension icon → go to the **Settings** tab.
 |---|---|---|---|
 | `google/gemini-2.5-flash` | OpenRouter | Low | Best balance of speed and accuracy ⭐ |
 | `google/gemini-2.5-flash-lite` | OpenRouter | Very low | Faster, good for simple pages |
-| `openai/gpt-4o` | OpenRouter | Medium | Excellent accuracy on complex layouts |
-| `anthropic/claude-opus-4-5` | OpenRouter | Higher | Best for dense or ambiguous content |
+| `openai/gpt-4o` | OpenRouter / OpenAI | Medium | Excellent accuracy on complex layouts |
+| `anthropic/claude-opus-4-5` | OpenRouter / Anthropic | Higher | Best for dense or ambiguous content |
+| Any vision deployment | Azure OpenAI | Varies | Use your own Azure-hosted model |
 
-> **Note:** OpenRouter free-tier credits may be limited. Top up at [openrouter.ai/settings/credits](https://openrouter.ai/settings/credits) if you hit 402 errors. Minimum top-up is $5.
+> **Note:** OpenRouter free-tier credits may be limited. Top up at [openrouter.ai/settings/credits](https://openrouter.ai/settings/credits) if you hit 402 errors.
 
 Click **Save All Settings** after making any changes.
 
@@ -126,14 +152,16 @@ Click **Save All Settings** after making any changes.
 
 1. On the translated source page (e.g. your Drupal site), take a full-page screenshot showing all the translated text
 2. Open the corresponding WPML translation job on `e.ate.wpml.org`
-3. Click the extension icon → go to the **Vision Fill** tab
+3. Click the extension icon to open the persistent window → go to the **Vision Fill** tab
 4. The strip will show the detected language, field count, and empty field count
 5. Drop or upload your screenshot into the upload zone
 6. Toggle **Only fill empty fields** as needed
 7. Click **Analyse Screenshot** — the AI reads the screenshot and maps translations
 8. Review the stats (matched / not found / total) and the preview table
-9. Click **Apply Translations to Page** — the extension fills each field automatically
-10. Watch the rows turn green as each segment is filled and saved
+9. Click **Apply Translations to Page** — a loading indicator appears while fields are being filled
+10. When complete, the status bar reports how many fields were filled, skipped, and unmatched
+
+> The window stays open throughout this process. Use **Re-analyse** to run the AI again on the same screenshot, or upload a new screenshot without losing your current results.
 
 #### Tips for better match rates
 - Take a **full-page screenshot** rather than a partial one — more visible text means more matches
@@ -157,9 +185,9 @@ wpml-vision-v2/
 ├── content.js          # Injected into WPML ATE pages
 │   ├─ Mode A           # TinyMCE detection, inline buttons, auto-advance loop
 │   └─ Mode B           # Segment scraping, vision fill, message bridge
-├── background.js       # Service worker — handles vision AI API calls
-│                       # Supports OpenRouter, OpenAI, and Anthropic
-├── popup.html          # Extension popup UI
+├── background.js       # Service worker — vision AI calls + popup window management
+│                       # Supports OpenRouter, OpenAI, Anthropic, Azure OpenAI
+├── popup.html          # Extension UI (persistent floating window)
 ├── popup.js            # Popup controller — tabs, upload, analyse, apply, settings
 ├── style.css           # Injected styles for AI Translate buttons in WPML editor
 ├── icon16.png          # Extension icons
@@ -172,7 +200,7 @@ wpml-vision-v2/
 ## Troubleshooting
 
 **"No WPML fields detected on active tab"**
-Make sure the active Chrome tab is an open WPML translation job at `e.ate.wpml.org/dashboard?id=...`. Reload the tab and try again.
+Make sure the active Chrome tab is an open WPML translation job at `e.ate.wpml.org/dashboard?id=...`. Switch to that tab, then click the **Vision Fill** tab in the extension window to re-detect fields.
 
 **AI Translate buttons not appearing in the editor**
 The buttons inject into `.otgs-editor-container .nav` when that element appears. If they don't appear, reload the WPML page and wait a few seconds for the editor to fully initialise.
@@ -182,6 +210,9 @@ Your account has insufficient credits. Top up at [openrouter.ai/settings/credits
 
 **400 error — invalid model ID**
 Model IDs on OpenRouter follow the format `provider/model-name` (e.g. `google/gemini-2.5-flash`). Do not append `:free` or `openrouter/` prefix. The Settings tab loads the live model list from OpenRouter to avoid this.
+
+**Azure API errors**
+Verify that the Endpoint includes the trailing slash and matches your Azure resource URL exactly. Confirm the Deployment Name matches what is shown in Azure OpenAI Studio. The API Version must match a version supported by your deployment (e.g. `2024-12-01-preview`).
 
 **Low match rate from Vision Fill**
 Try a more capable model (`openai/gpt-4o` or `anthropic/claude-opus-4-5`). Also ensure the screenshot clearly shows all the translated text and is not cut off.

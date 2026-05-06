@@ -84,7 +84,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   const azureDeployment = document.getElementById('azureDeployment').value.trim();
   const azureApiVersion = document.getElementById('azureApiVersion').value.trim();
 
-  if (!model) { showStatus('settingsStatus', 'error', '❌ Please select a model'); return; }
+  if (orKey && !model) { showStatus('settingsStatus', 'error', '❌ Please select an OpenRouter model for Auto Translate'); return; }
   if (!prompt) { showStatus('settingsStatus', 'error', '❌ System prompt cannot be empty'); return; }
   if (vProvider === 'azure' && (!azureEndpoint || !azureDeployment)) {
     showStatus('settingsStatus', 'error', '❌ Azure requires Endpoint and Deployment Name'); return;

@@ -394,15 +394,26 @@
       <option value="openrouter">OpenRouter (reuse key above)</option>
       <option value="openai">OpenAI</option>
       <option value="anthropic">Anthropic (Claude)</option>
+      <option value="azure">Azure OpenAI</option>
     </select>
   </div>
 
   <div class="form-group" id="visionKeyGroup" style="display:none">
-    <label class="form-label">Vision API Key <span class="help" style="display:inline">(if different from OpenRouter)</span></label>
+    <label class="form-label" id="visionKeyLabel">Vision API Key <span class="help" style="display:inline">(if different from OpenRouter)</span></label>
     <input type="password" class="form-control" id="visionKey" placeholder="sk-...">
   </div>
 
-  <div class="form-group">
+  <div class="form-group" id="azureGroup" style="display:none">
+    <label class="form-label">Endpoint</label>
+    <input type="text" class="form-control" id="azureEndpoint" placeholder="https://your-resource.openai.azure.com/">
+    <div class="help">From Azure portal → Keys and Endpoint</div>
+    <label class="form-label" style="margin-top:10px">Deployment Name</label>
+    <input type="text" class="form-control" id="azureDeployment" placeholder="my-gpt-4o-deployment" style="margin-top:5px">
+    <label class="form-label" style="margin-top:10px">API Version</label>
+    <input type="text" class="form-control" id="azureApiVersion" placeholder="2024-12-01-preview" style="margin-top:5px">
+  </div>
+
+  <div class="form-group" id="visionModelGroup">
     <label class="form-label">Vision Model</label>
     <select class="form-control" id="visionModel">
       <optgroup label="✅ Free on OpenRouter">

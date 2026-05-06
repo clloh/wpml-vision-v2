@@ -13,7 +13,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 });
 
-async function handleVisionCall({ provider, apiKey, model, imageBase64, sourceFields, targetLanguage }) {
+async function handleVisionCall({ provider, apiKey, model, imageBase64, sourceFields, targetLanguage, azureEndpoint, azureDeployment, azureApiVersion }) {
   const system = `You are a professional translation assistant helping migrate content from a Drupal website to WordPress/WPML.
 
 You will receive:
@@ -44,6 +44,9 @@ Extract the ${targetLanguage} translations from the screenshot and return a JSON
   }
   if (provider === 'anthropic') {
     return await callAnthropicAPI(apiKey, model, system, userPrompt, imageBase64);
+  }
+  if (provider === 'azure') {
+    return await callAzureOpenAIAPI(apiKey, azureEndpoint, azureDeployment, azureApiVersion, system, userPrompt, imageBase64);
   }
   throw new Error('Unknown provider: ' + provider);
 }
@@ -120,6 +123,41 @@ async function callAnthropicAPI(apiKey, model, system, userPrompt, imageBase64) 
 
   const data = await res.json();
   return parseJSON(data.content[0].text);
+}
+
+async function callAzureOpenAIAPI(apiKey, endpoint, deployment, apiVersion, system, userPrompt, imageBase64) {
+  const base = endpoint.replace(/\/$/, '');
+  const url  = `${base}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
+
+  const body = {
+    max_tokens: 3800,
+    messages: [
+      { role: 'system', content: system },
+      {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:image/png;base64,${imageBase64}`, detail: 'high' } },
+          { type: 'text', text: userPrompt }
+        ]
+      }
+    ]
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'api-key': apiKey },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    let msg = t;
+    try { msg = JSON.parse(t)?.error?.message || t; } catch {}
+    throw new Error(`Azure OpenAI ${res.status}: ${msg}`);
+  }
+
+  const data = await res.json();
+  return parseJSON(data.choices[0].message.content);
 }
 
 function parseJSON(text) {

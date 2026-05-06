@@ -44,7 +44,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadSettings() {
   const s = await chromeGet([
     'openrouterApiKey', 'openrouterSelectedModel', 'systemPrompt',
-    'visionProvider', 'visionKey', 'visionModel'
+    'visionProvider', 'visionKey', 'visionModel',
+    'azureEndpoint', 'azureDeployment', 'azureApiVersion'
   ]);
 
   const orKey = s.openrouterApiKey || '';
@@ -53,6 +54,9 @@ async function loadSettings() {
   document.getElementById('visionProvider').value = s.visionProvider || 'openrouter';
   document.getElementById('visionKey').value   = s.visionKey || '';
   document.getElementById('visionModel').value = s.visionModel || 'google/gemini-2.5-flash';
+  document.getElementById('azureEndpoint').value   = s.azureEndpoint || '';
+  document.getElementById('azureDeployment').value = s.azureDeployment || '';
+  document.getElementById('azureApiVersion').value = s.azureApiVersion || '2024-12-01-preview';
 
   updateOrKeyStatus(!!orKey);
   updateVisionKeyVisibility(s.visionProvider || 'openrouter');
@@ -70,15 +74,21 @@ async function loadSettings() {
 // ─── SETTINGS: SAVE ───────────────────────────────────────────────────────────
 
 document.getElementById('saveBtn').addEventListener('click', async () => {
-  const orKey       = document.getElementById('orKey').value.trim();
-  const model       = document.getElementById('modelSelect').value.trim();
-  const prompt      = document.getElementById('systemPrompt').value.trim();
-  const vProvider   = document.getElementById('visionProvider').value;
-  const vKey        = document.getElementById('visionKey').value.trim();
-  const vModel      = document.getElementById('visionModel').value;
+  const orKey          = document.getElementById('orKey').value.trim();
+  const model          = document.getElementById('modelSelect').value.trim();
+  const prompt         = document.getElementById('systemPrompt').value.trim();
+  const vProvider      = document.getElementById('visionProvider').value;
+  const vKey           = document.getElementById('visionKey').value.trim();
+  const vModel         = document.getElementById('visionModel').value;
+  const azureEndpoint  = document.getElementById('azureEndpoint').value.trim();
+  const azureDeployment = document.getElementById('azureDeployment').value.trim();
+  const azureApiVersion = document.getElementById('azureApiVersion').value.trim();
 
   if (!model) { showStatus('settingsStatus', 'error', '❌ Please select a model'); return; }
   if (!prompt) { showStatus('settingsStatus', 'error', '❌ System prompt cannot be empty'); return; }
+  if (vProvider === 'azure' && (!azureEndpoint || !azureDeployment)) {
+    showStatus('settingsStatus', 'error', '❌ Azure requires Endpoint and Deployment Name'); return;
+  }
 
   await chrome.storage.sync.set({
     openrouterApiKey: orKey,
@@ -86,7 +96,10 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     systemPrompt: prompt,
     visionProvider: vProvider,
     visionKey: vKey,
-    visionModel: vModel
+    visionModel: vModel,
+    azureEndpoint,
+    azureDeployment,
+    azureApiVersion: azureApiVersion || '2024-12-01-preview'
   });
 
   updateOrKeyStatus(!!orKey);
@@ -156,8 +169,19 @@ document.getElementById('visionProvider').addEventListener('change', e => {
 });
 
 function updateVisionKeyVisibility(provider) {
-  document.getElementById('visionKeyGroup').style.display =
-    (provider === 'openai' || provider === 'anthropic') ? 'block' : 'none';
+  const needsKey = provider === 'openai' || provider === 'anthropic' || provider === 'azure';
+  document.getElementById('visionKeyGroup').style.display = needsKey ? 'block' : 'none';
+  document.getElementById('azureGroup').style.display = provider === 'azure' ? 'block' : 'none';
+  document.getElementById('visionModelGroup').style.display = provider === 'azure' ? 'none' : 'block';
+
+  const label = document.getElementById('visionKeyLabel');
+  if (provider === 'azure') {
+    label.textContent = 'Azure API Key';
+    document.getElementById('visionKey').placeholder = 'Azure API key from portal';
+  } else {
+    label.innerHTML = 'Vision API Key <span class="help" style="display:inline">(if different from OpenRouter)</span>';
+    document.getElementById('visionKey').placeholder = 'sk-...';
+  }
 }
 
 function updateStripProvider() {
@@ -254,7 +278,10 @@ document.getElementById('reanalyzeBtn').addEventListener('click', runAnalysis);
 async function runAnalysis() {
   if (!screenshotBase64) { showStatus('visionStatus', 'error', '❌ Upload a screenshot first.'); return; }
 
-  const s = await chromeGet(['openrouterApiKey', 'visionProvider', 'visionKey', 'visionModel']);
+  const s = await chromeGet([
+    'openrouterApiKey', 'visionProvider', 'visionKey', 'visionModel',
+    'azureEndpoint', 'azureDeployment', 'azureApiVersion'
+  ]);
   const provider = s.visionProvider || 'openrouter';
   const apiKey   = (provider === 'openrouter') ? s.openrouterApiKey : s.visionKey;
   const model    = s.visionModel || 'google/gemini-2.5-flash';
@@ -278,7 +305,15 @@ async function runAnalysis() {
     const result = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({
         type: 'VISION_API_CALL',
-        payload: { provider, apiKey, model, imageBase64: screenshotBase64, sourceFields: fieldsToSend, targetLanguage }
+        payload: {
+          provider, apiKey, model,
+          imageBase64: screenshotBase64,
+          sourceFields: fieldsToSend,
+          targetLanguage,
+          azureEndpoint: s.azureEndpoint || '',
+          azureDeployment: s.azureDeployment || '',
+          azureApiVersion: s.azureApiVersion || '2024-12-01-preview'
+        }
       }, res => {
         if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
         if (res.success) resolve(res.data);

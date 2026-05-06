@@ -29,6 +29,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'vision') refreshPageInfo();
   });
 });
 
@@ -399,7 +400,13 @@ function chromeGet(keys) {
 }
 
 function getActiveTab() {
-  return new Promise(resolve => chrome.tabs.query({ active: true, currentWindow: true }, t => resolve(t[0] || null)));
+  return new Promise(resolve => {
+    chrome.windows.getAll({ windowTypes: ['normal'], populate: true }, windows => {
+      if (chrome.runtime.lastError || !windows.length) { resolve(null); return; }
+      const target = windows.find(w => w.focused) || windows[windows.length - 1];
+      resolve(target.tabs?.find(t => t.active) || null);
+    });
+  });
 }
 
 function showStatus(id, type, html) {

@@ -4,6 +4,43 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log('[WPML AI] Extension v2 installed.');
 });
 
+// ─── POPUP WINDOW MANAGEMENT ─────────────────────────────────────────────────
+
+let popupWindowId = null;
+
+chrome.action.onClicked.addListener(() => {
+  if (popupWindowId !== null) {
+    chrome.windows.get(popupWindowId, win => {
+      if (chrome.runtime.lastError || !win) {
+        openPopupWindow();
+      } else {
+        chrome.windows.update(popupWindowId, { focused: true });
+      }
+    });
+  } else {
+    openPopupWindow();
+  }
+});
+
+async function openPopupWindow() {
+  const popupUrl = chrome.runtime.getURL('popup.html');
+  const all = await chrome.windows.getAll({ populate: true });
+  const existing = all.find(w => w.tabs?.some(t => t.url === popupUrl));
+  if (existing) {
+    chrome.windows.update(existing.id, { focused: true });
+    popupWindowId = existing.id;
+    return;
+  }
+  chrome.windows.create(
+    { url: popupUrl, type: 'popup', width: 500, height: 740, focused: true },
+    win => { popupWindowId = win.id; }
+  );
+}
+
+chrome.windows.onRemoved.addListener(windowId => {
+  if (windowId === popupWindowId) popupWindowId = null;
+});
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'VISION_API_CALL') {
     handleVisionCall(msg.payload)

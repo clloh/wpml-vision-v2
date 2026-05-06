@@ -39,6 +39,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   await refreshPageInfo();
 });
 
+document.getElementById('closeBtn').addEventListener('click', () => window.close());
+
 // ─── SETTINGS: LOAD ───────────────────────────────────────────────────────────
 
 async function loadSettings() {
@@ -369,18 +371,23 @@ document.getElementById('applyBtn').addEventListener('click', async () => {
   if (!tab) return;
 
   const onlyEmpty = document.getElementById('onlyEmpty').checked;
+  const applyBtn  = document.getElementById('applyBtn');
+
+  applyBtn.disabled = true;
+  showStatus('visionStatus', 'loading', '<span class="spinner"></span> Filling fields into page…');
 
   chrome.tabs.sendMessage(tab.id, {
     type: 'VISION_FILL',
     payload: { translations: aiTranslations, onlyEmpty }
   }, res => {
+    applyBtn.disabled = false;
     if (chrome.runtime.lastError) {
       showStatus('visionStatus', 'error', '❌ ' + chrome.runtime.lastError.message);
       return;
     }
     if (res) {
       showStatus('visionStatus', 'success',
-        `✅ Filled ${res.filled} · skipped ${res.skipped} · unmatched ${res.missed}`);
+        `✅ Done — filled ${res.filled} · skipped ${res.skipped} · unmatched ${res.missed}`);
     }
   });
 });

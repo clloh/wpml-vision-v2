@@ -59,15 +59,49 @@ Output format: Return ONLY the translation. No quotes, no language labels, no ex
   // The TinyMCE iframe (id ends in _ifr) is the ONE active editor,
   // shown when a segment is clicked/active (.sentence-in-progress).
 
+  // Converts WPML chip elements inside an .original-sentence node into semantic HTML tags.
+  // If the source panel contains no chips, falls back to plain innerText.
+  const getSourceHTML = (el) => {
+    if (!el) return '';
+    const chips = el.querySelectorAll('.chip-tag-name');
+    if (!chips.length) return el.innerText?.trim() || '';
+
+    const ALLOWED = new Set(['strong', 'em', 'u', 'b', 'i', 's']);
+    const openTags = {};
+
+    const walk = (node) => {
+      if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+      // Chip container — convert to an HTML open/close tag
+      const tagNameEl = node.querySelector?.('.chip-tag-name');
+      if (tagNameEl && node.matches?.('.single-chip-container, .chipContainer')) {
+        const tag = tagNameEl.textContent.trim().toLowerCase();
+        if (!ALLOWED.has(tag)) return '';
+        if (openTags[tag]) { delete openTags[tag]; return `</${tag}>`; }
+        openTags[tag] = true;
+        return `<${tag}>`;
+      }
+      return [...node.childNodes].map(walk).join('');
+    };
+
+    let html = [...el.childNodes].map(walk).join('').trim();
+    // Close any tags the source forgot to close
+    for (const tag of Object.keys(openTags)) html += `</${tag}>`;
+    return html || el.innerText?.trim() || '';
+  };
+
   const getSegmentRows = () => {
-    return [...document.querySelectorAll('.sentences-row')].map(row => ({
-      rowEl:      row,
-      mrkId:      row.id,
-      sourceText: row.querySelector('.original-sentence')?.innerText?.trim() || '',
-      targetText: row.querySelector('.target-sentence')?.innerText?.trim()   || '',
-      isEmpty:    !!row.querySelector('.add-translation'),
-      isActive:   row.classList.contains('sentence-in-progress'),
-    })).filter(s => s.sourceText.length > 0);
+    return [...document.querySelectorAll('.sentences-row')].map(row => {
+      const sourceEl = row.querySelector('.original-sentence');
+      return {
+        rowEl:      row,
+        mrkId:      row.id,
+        sourceText: sourceEl?.innerText?.trim() || '',
+        sourceHTML: getSourceHTML(sourceEl),
+        targetText: row.querySelector('.target-sentence')?.innerText?.trim() || '',
+        isEmpty:    !!row.querySelector('.add-translation'),
+        isActive:   row.classList.contains('sentence-in-progress'),
+      };
+    }).filter(s => s.sourceText.length > 0);
   };
 
   const findEditorIframe = () => {
@@ -161,7 +195,17 @@ Output format: Return ONLY the translation. No quotes, no language labels, no ex
   const runAutoTranslate = async (autoAll) => {
     stopTranslation = false;
     if (!apiKey) { alert('Configure your OpenRouter API key in the extension popup → Settings tab.'); return; }
-    const text = getEditorHTML();
+
+    // Prefer chip-derived source HTML (preserves bold/italic) over raw TinyMCE content.
+    // Falls back to TinyMCE if no chips are found in the source panel.
+    const activeRow = document.querySelector('.sentence-in-progress');
+    const chipHTML  = getSourceHTML(activeRow?.querySelector('.original-sentence'));
+    const editorHTML = getEditorHTML();
+    // Use chip HTML only when it actually carries formatting (differs from plain text)
+    const sourceEl  = activeRow?.querySelector('.original-sentence');
+    const hasChips  = chipHTML && sourceEl && chipHTML !== (sourceEl.innerText?.trim() || '');
+    const text      = hasChips ? chipHTML : editorHTML;
+
     const lang = getTargetLanguage();
     if (!text) { alert('No active editor field found. Click a segment row first to open it.'); return; }
     setWorking(true, autoAll);
@@ -185,7 +229,7 @@ Output format: Return ONLY the translation. No quotes, no language labels, no ex
           model: selectedModel, max_tokens: 4000,
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: `Translate the following to ${lang}:\n\n${text}` }
+            { role: 'user', content: `Translate the following to ${lang}. If the input contains HTML tags such as <strong> or <em>, place them in the semantically equivalent positions in the translation — do not drop or move them:\n\n${text}` }
           ]
         }),
         signal: currentAbortController.signal
@@ -311,7 +355,7 @@ Output format: Return ONLY the translation. No quotes, no language labels, no ex
     if (msg.type === 'GET_PAGE_FIELDS') {
       const segs = getSegmentRows();
       sendResponse({
-        fields:   segs.map(s => ({ sourceText: s.sourceText, targetText: s.targetText, isEmpty: s.isEmpty })),
+        fields:   segs.map(s => ({ sourceText: s.sourceText, sourceHTML: s.sourceHTML, targetText: s.targetText, isEmpty: s.isEmpty })),
         language: getTargetLanguage(),
         url:      window.location.href
       });

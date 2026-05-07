@@ -62,6 +62,13 @@ Your task:
 - Match each English source string to its ${targetLanguage} translation visible in the screenshot
 - Return a flat JSON object: { "english source string": "translated string", ... }
 
+Inline formatting (IMPORTANT):
+- Inspect the screenshot carefully for text styling
+- If a word or phrase appears visually BOLD in the screenshot, wrap it in <strong> tags in the value
+- If a word or phrase appears visually ITALIC in the screenshot, wrap it in <em> tags in the value
+- Example value with bold: "<strong>En partenariat avec nous</strong>, il est facile de concevoir votre nouveau réseau"
+- Values are HTML strings — use tags only where the formatting is clearly visible in the screenshot
+
 Rules:
 - Match by semantic meaning, not by position on screen
 - For CSS/code tokens like "class", "span 1", "container" — return them unchanged (copy English value as-is)
@@ -74,7 +81,7 @@ Rules:
 English source strings to translate:
 ${JSON.stringify(sourceFields, null, 2)}
 
-Extract the ${targetLanguage} translations from the screenshot and return a JSON object mapping each English string to its translation.`;
+Extract the ${targetLanguage} translations from the screenshot. Return a JSON object mapping each English string to its ${targetLanguage} translation. Use <strong> or <em> HTML tags in the values wherever that text appears bold or italic in the screenshot.`;
 
   if (provider === 'openrouter' || provider === 'openai') {
     return await callOpenCompatAPI(provider, apiKey, model, system, userPrompt, imageBase64);

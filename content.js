@@ -59,34 +59,24 @@ Output format: Return ONLY the translation. No quotes, no language labels, no ex
   // The TinyMCE iframe (id ends in _ifr) is the ONE active editor,
   // shown when a segment is clicked/active (.sentence-in-progress).
 
-  // Converts WPML chip elements inside an .original-sentence node into semantic HTML tags.
-  // If the source panel contains no chips, falls back to plain innerText.
+  // WPML ATE stores inline formatting as XLIFF <g ctype="x-html-TAG"> elements in the
+  // .original-sentence div of the segment list. This converts them to semantic HTML tags
+  // so the AI can see and preserve bold/italic in its translation output.
   const getSourceHTML = (el) => {
     if (!el) return '';
-    const chips = el.querySelectorAll('.chip-tag-name');
-    if (!chips.length) return el.innerText?.trim() || '';
+    const raw = el.innerHTML || '';
 
-    const ALLOWED = new Set(['strong', 'em', 'u', 'b', 'i', 's']);
-    const openTags = {};
+    const FORMATTING_TAGS = new Set(['strong', 'em', 'b', 'i', 'u', 's']);
 
-    const walk = (node) => {
-      if (node.nodeType === Node.TEXT_NODE) return node.textContent;
-      // Chip container — convert to an HTML open/close tag
-      const tagNameEl = node.querySelector?.('.chip-tag-name');
-      if (tagNameEl && node.matches?.('.single-chip-container, .chipContainer')) {
-        const tag = tagNameEl.textContent.trim().toLowerCase();
-        if (!ALLOWED.has(tag)) return '';
-        if (openTags[tag]) { delete openTags[tag]; return `</${tag}>`; }
-        openTags[tag] = true;
-        return `<${tag}>`;
-      }
-      return [...node.childNodes].map(walk).join('');
-    };
+    // <g ctype="x-html-strong">text</g>  →  <strong>text</strong>
+    // <g ctype="x-html-span">text</g>    →  text  (structural, not semantic formatting)
+    const formatted = raw.replace(
+      /<g\b[^>]*\bctype="x-html-([a-z0-9]+)"[^>]*>([\s\S]*?)<\/g>/gi,
+      (_, tag, content) => FORMATTING_TAGS.has(tag) ? `<${tag}>${content}</${tag}>` : content
+    );
 
-    let html = [...el.childNodes].map(walk).join('').trim();
-    // Close any tags the source forgot to close
-    for (const tag of Object.keys(openTags)) html += `</${tag}>`;
-    return html || el.innerText?.trim() || '';
+    // Strip any remaining XLIFF inline elements (<g>, <x/>, <ph>, etc.)
+    return formatted.replace(/<\/?[gxph]\b[^>]*\/?>/gi, '').trim();
   };
 
   const getSegmentRows = () => {
@@ -196,15 +186,13 @@ Output format: Return ONLY the translation. No quotes, no language labels, no ex
     stopTranslation = false;
     if (!apiKey) { alert('Configure your OpenRouter API key in the extension popup → Settings tab.'); return; }
 
-    // Prefer chip-derived source HTML (preserves bold/italic) over raw TinyMCE content.
-    // Falls back to TinyMCE if no chips are found in the source panel.
-    const activeRow = document.querySelector('.sentence-in-progress');
-    const chipHTML  = getSourceHTML(activeRow?.querySelector('.original-sentence'));
-    const editorHTML = getEditorHTML();
-    // Use chip HTML only when it actually carries formatting (differs from plain text)
+    // Read from the SOURCE panel of the currently-open segment (.sentence-current),
+    // not from TinyMCE which holds the existing (possibly wrong) translation.
+    // getSourceHTML converts XLIFF <g ctype="x-html-strong"> → <strong> so the AI
+    // sees and preserves bold/italic in the output.
+    const activeRow = document.querySelector('.sentence-current');
     const sourceEl  = activeRow?.querySelector('.original-sentence');
-    const hasChips  = chipHTML && sourceEl && chipHTML !== (sourceEl.innerText?.trim() || '');
-    const text      = hasChips ? chipHTML : editorHTML;
+    const text      = sourceEl ? getSourceHTML(sourceEl) : getEditorHTML();
 
     const lang = getTargetLanguage();
     if (!text) { alert('No active editor field found. Click a segment row first to open it.'); return; }
@@ -267,7 +255,9 @@ Output format: Return ONLY the translation. No quotes, no language labels, no ex
     saveBtn.click();
     await sleep(1200);
     if (stopTranslation) return;
-    if (document.querySelector('.add-translation, .sentence-in-progress')) {
+    // .sentence-current = editor still open on the next segment after WPML auto-advances
+    // .add-translation  = untranslated segments still waiting
+    if (document.querySelector('.sentence-current, .add-translation')) {
       document.querySelector('.wpml-ai-all-btn')?.click();
     } else {
       console.log('[WPML AI] Auto-translate complete.');

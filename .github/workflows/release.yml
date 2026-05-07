@@ -1,0 +1,32 @@
+name: Attach extension zip to release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build extension zip
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          ZIP_NAME="wpml-vision-${VERSION}.zip"
+          zip -r "$ZIP_NAME" \
+            manifest.json \
+            background.js \
+            content.js \
+            popup.html \
+            popup.js \
+            style.css \
+            icon16.png \
+            icon48.png \
+            icon128.png
+          echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
+
+      - name: Upload zip to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP_NAME }}

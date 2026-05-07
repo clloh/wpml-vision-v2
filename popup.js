@@ -265,10 +265,8 @@ function handleFile(file) {
     document.getElementById('previewImg').src = dataUrl;
     document.getElementById('previewWrap').style.display = 'block';
     uploadZone.style.display = 'none';
-    if (pageFields) document.getElementById('analyzeBtn').disabled = false;
-    else refreshPageInfo().then(() => {
-      if (pageFields) document.getElementById('analyzeBtn').disabled = false;
-    });
+    document.getElementById('analyzeBtn').disabled = false;
+    if (!pageFields) refreshPageInfo();
   };
   reader.readAsDataURL(file);
 }
